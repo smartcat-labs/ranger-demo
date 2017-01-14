@@ -1,7 +1,6 @@
 package io.smartcat;
 
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.Assert;
@@ -9,7 +8,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -19,7 +17,9 @@ import io.smartcat.data.loader.RandomBuilder;
 import io.smartcat.domain.Measurement;
 import io.smartcat.domain.User;
 import io.smartcat.repository.UserRepository;
+import io.smartcat.service.AvgHeartBeatRateDTO;
 import io.smartcat.service.MeasurementService;
+import io.smartcat.service.ReportService;
 import io.smartcat.service.UserService;
 
 @RunWith(SpringRunner.class)
@@ -37,6 +37,9 @@ public class RangerDemoApplicationTests {
 	
 	@Autowired
 	private MeasurementService measurementService;
+	
+	@Autowired
+	private ReportService reportService;
 
 	@Test
 	public void contextLoads() {
@@ -131,45 +134,97 @@ public class RangerDemoApplicationTests {
 		
 	}
 	
-	// FIND THE MAXIMUM HEART BEAT MONITOR measured value for the user
-	//
-	// for each user we need a bunch of Heart Beat Monitor data with one value that is the max
-	// for each user we need a bunch of sensor data with values that are about max for heart beat
-	// for each user we need different max values in order to achieve that the maximum is only the max for the current user, not for all users
-	// 
-	private void createMaxHeartBeatData() {
+	@Test
+	public void avg_heart_beat_should_return_correct_results() {
+		createAverageHeartBeatData();
+		List<AvgHeartBeatRateDTO> result = reportService.calcAvgHeartBeatRate(100, 110);
+		Assert.assertEquals(2, result.size());
+		for (AvgHeartBeatRateDTO dto : result) {
+			if (dto.getUsername().equals("alex")) {
+				Assert.assertEquals(61, dto.getAvgHeartBeatRate(), 0.0001);
+			} else {
+				Assert.assertEquals("bob", dto.getUsername());
+				Assert.assertEquals(71, dto.getAvgHeartBeatRate(), 0.0001);
+			}
+		}
+		
+	}
+
+	// 1. make sure average is calculated correctly - the tricky part, small number of measurements for one user only?
+	// 	avg for alex = 61; avg for bob = 71
+	// 2. create other sensors in correct time window
+	// 3. create hbm data in wrong time window (before and after)
+	// 4. 
+	private void createAverageHeartBeatData() {
 		String hbm = "Heart Beat Monitor";
-		RandomBuilder<Measurement> measurmentsHBMForAlex = new RandomBuilder<>(Measurement.class);
-		measurmentsHBMForAlex
-			.randomFrom("sensor", hbm) 
-			.randomFrom("owner", "alex")
-			.randomFromRange("created", 15000L, 15050L)
-			.randomFromRange("measuredValue", 30L, 121L)
-			.toBeBuilt(50);
-		
-		RandomBuilder<Measurement> otherSensorsForAllUsers = new RandomBuilder<>(Measurement.class); // noise
-		otherSensorsForAllUsers
-			.randomFrom("sensor", "a", "b", "c") 
+		RandomBuilder<Measurement> measurmentsBefore = new RandomBuilder<>(Measurement.class);
+		measurmentsBefore
+			.randomFrom("sensor", hbm, "a sensor", "b sensor", "c sensor") 
 			.randomFrom("owner", "alex", "bob", "charlie", "david")
-			.randomFromRange("created", 15000L, 15050L)
-			.randomFromRange("measuredValue", 0L, 3000L)
-			.toBeBuilt(50000);
+			.randomFromRange("created", 90L, 100L)
+			.randomFromRange("measuredValue", 30L, 121L)
+			.toBeBuilt(500);
 		
-		RandomBuilder<Measurement> measurmentsHBMForBob = new RandomBuilder<>(Measurement.class);
-		measurmentsHBMForBob
+		RandomBuilder<Measurement> measurmentsAfter = new RandomBuilder<>(Measurement.class);
+		measurmentsAfter
+			.randomFrom("sensor", hbm, "a sensor", "b sensor", "c sensor") 
+			.randomFrom("owner", "alex", "bob", "charlie", "david")
+			.randomFromRange("created", 110L, 120L)
+			.randomFromRange("measuredValue", 30L, 121L)
+			.toBeBuilt(500);
+		
+		RandomBuilder<Measurement> otherSensorsInCorrectTimeRange = new RandomBuilder<>(Measurement.class);
+		otherSensorsInCorrectTimeRange
+			.randomFrom("sensor", "a sensor", "b sensor", "c sensor") 
+			.randomFrom("owner", "alex", "bob", "charlie", "david")
+			.randomFromRange("created", 100L, 110L)
+			.randomFromRange("measuredValue", 30L, 121L)
+			.toBeBuilt(500);
+		
+		RandomBuilder<Measurement> dataOfInterestForAlex1 = new RandomBuilder<>(Measurement.class);
+		dataOfInterestForAlex1
 			.randomFrom("sensor", hbm) 
 			.randomFrom("owner", "alex")
-			.randomFromRange("created", 15000L, 15050L)
-			.randomFromRange("measuredValue", 30L, 151L)
-			.toBeBuilt(50);
+			.randomFromRange("created", 100L, 110L)
+			.randomFromRange("measuredValue", 60L, 61L)
+			.toBeBuilt(1);
 		
-		RandomBuilder<Measurement> measurmentsHBMForCharlie = new RandomBuilder<>(Measurement.class);
-		measurmentsHBMForCharlie
+		RandomBuilder<Measurement> dataOfInterestForAlex2 = new RandomBuilder<>(Measurement.class);
+		dataOfInterestForAlex2
 			.randomFrom("sensor", hbm) 
 			.randomFrom("owner", "alex")
-			.randomFromRange("created", 15000L, 15050L)
-			.randomFromRange("measuredValue", 30L, 200L)
-			.toBeBuilt(50);
+			.randomFromRange("created", 100L, 110L)
+			.randomFromRange("measuredValue", 62L, 63L)
+			.toBeBuilt(1);
+		
+		RandomBuilder<Measurement> dataOfInterestForBob = new RandomBuilder<>(Measurement.class);
+		dataOfInterestForBob
+			.randomFrom("sensor", hbm) 
+			.randomFrom("owner", "bob")
+			.randomFromRange("created", 100L, 110L)
+			.randomFromRange("measuredValue", 70L, 71L)
+			.toBeBuilt(1);
+		
+		RandomBuilder<Measurement> dataOfInterestForBob2 = new RandomBuilder<>(Measurement.class);
+		dataOfInterestForBob2
+			.randomFrom("sensor", hbm) 
+			.randomFrom("owner", "bob")
+			.randomFromRange("created", 100L, 110L)
+			.randomFromRange("measuredValue", 72L, 73L)
+			.toBeBuilt(1);
+		
+		BuildRunner<Measurement> runner = new BuildRunner<>();
+		runner.addBuilder(measurmentsBefore);
+		runner.addBuilder(measurmentsAfter);
+		runner.addBuilder(otherSensorsInCorrectTimeRange);
+		runner.addBuilder(dataOfInterestForAlex1);
+		
+		runner.addBuilder(dataOfInterestForAlex2);
+		runner.addBuilder(dataOfInterestForBob);
+		runner.addBuilder(dataOfInterestForBob2);
+		
+		List<Measurement> measurements = runner.build();
+		mongoOps.insertAll(measurements);
 	}
 	
 	
