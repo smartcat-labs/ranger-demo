@@ -11,6 +11,7 @@ public class Measurement {
 	private long created;
 	private String sensor;
 	private String owner;
+	private long measuredValue;
 	
 	public String getId() {
 		return id;
@@ -35,6 +36,12 @@ public class Measurement {
 	}
 	public void setOwner(String owner) {
 		this.owner = owner;
+	}
+	public long getMeasuredValue() {
+		return measuredValue;
+	}
+	public void setMeasuredValue(long measuredValue) {
+		this.measuredValue = measuredValue;
 	}
 
 }
