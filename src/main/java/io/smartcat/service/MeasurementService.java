@@ -18,6 +18,7 @@ public class MeasurementService {
 
 	public List<Measurement> getNewestMeasurementsForUser(String username, int limit) {
 		PageRequest request = new PageRequest(0, limit, new Sort(Sort.Direction.DESC, "created"));
+		// db.measurements.find( { owner : "passed_username" }).sort( { created : -1 }).limit(50);
 		return measurementRepository.findByOwner(username, request);
 	}
 }

@@ -11,5 +11,6 @@ import io.smartcat.domain.Measurement;
 public interface MeasurementRepository  extends CrudRepository<Measurement, Serializable>{
 	
 	List<Measurement> findByOwner(String owner, Pageable pageable);
+	List<Measurement> findByOwnerAndSensor(String owner, String sensor);
 
 }

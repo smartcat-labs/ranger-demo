@@ -16,6 +16,7 @@ import io.smartcat.data.loader.BuildRunner;
 import io.smartcat.data.loader.RandomBuilder;
 import io.smartcat.domain.Measurement;
 import io.smartcat.domain.User;
+import io.smartcat.repository.MeasurementRepository;
 import io.smartcat.repository.UserRepository;
 import io.smartcat.service.AvgHeartBeatRateDTO;
 import io.smartcat.service.MeasurementService;
@@ -37,6 +38,9 @@ public class RangerDemoApplicationTests {
 	
 	@Autowired
 	private MeasurementService measurementService;
+	
+	@Autowired
+	private MeasurementRepository measurementRepository;
 	
 	@Autowired
 	private ReportService reportService;
@@ -147,7 +151,6 @@ public class RangerDemoApplicationTests {
 				Assert.assertEquals(71, dto.getAvgHeartBeatRate(), 0.0001);
 			}
 		}
-		
 	}
 
 	// 1. make sure average is calculated correctly - the tricky part, small number of measurements for one user only?
@@ -227,10 +230,58 @@ public class RangerDemoApplicationTests {
 		mongoOps.insertAll(measurements);
 	}
 	
+	@Test
+	public void findByOwnerAndSensor_shouldFindMeasurements_ForPassedOwnerAndSensorOnly() {
+		createTestDataFor_findByOwnerAndSensor();
+		List<Measurement> result = measurementRepository.findByOwnerAndSensor("alex", "HEART_BEAT_MONITOR");
+		
+		Assert.assertEquals(10, result.size());
+		result.forEach(measurement -> Assert.assertEquals("alex", measurement.getOwner()));
+		result.forEach(measurement -> Assert.assertEquals("HEART_BEAT_MONITOR", measurement.getSensor()));
+		
+	}
 	
-	
-	private void createMeasurementsManually() {
-		// TODO
+	// owners: [alex, bob, charlie, david]
+	// sensors: [HEART_BEAT_MONITOR, ACCELEROMETER, COMPAS, THIRD_PARTY_SENSOR]
+	// 
+	// 1. measurements for owner = 'alex' and sensor HEART_BEAT_MONITOR // target data
+	// 2. measurements for owner = 'alex' and sensors:  [ACCELEROMETER, COMPAS, THIRD_PARTY_SENSOR] // noise
+	// 3. measurements for owner = [bob, charlie, david] and sensors [HEART_BEAT_MONITOR, ACCELEROMETER, COMPAS, THIRD_PARTY_SENSOR] // noise
+	// 
+	private void createTestDataFor_findByOwnerAndSensor() {
+		RandomBuilder<Measurement> heartBeatMonitorDataForAlex = new RandomBuilder<>(Measurement.class);
+		heartBeatMonitorDataForAlex
+			.randomFrom("sensor", "HEART_BEAT_MONITOR") 
+			.randomFrom("owner", "alex")
+			.randomFromRange("created", 100L, 110L)
+			.randomFromRange("measuredValue", 60L, 61L)
+			.toBeBuilt(10);
+		
+		RandomBuilder<Measurement> otherSensorDataForAlex = new RandomBuilder<>(Measurement.class);
+		otherSensorDataForAlex
+			.randomFrom("sensor", "ACCELEROMETER", "COMPAS", "THIRD_PARTY_SENSOR") 
+			.randomFrom("owner", "alex")
+			.randomFromRange("created", 110L, 120L)
+			.randomFromRange("measuredValue", 3L, 100L)
+			.toBeBuilt(100);
+		
+		RandomBuilder<Measurement> sensorDataForOtherUsers = new RandomBuilder<>(Measurement.class);
+		sensorDataForOtherUsers
+			.randomFrom("sensor", "HEART_BEAT_MONITOR", "ACCELEROMETER", "COMPAS", "THIRD_PARTY_SENSOR") 
+			.randomFrom("owner", "bob", "charlie", "david")
+			.randomFromRange("created", 150L, 200L)
+			.randomFromRange("measuredValue", 3L, 100L)
+			.toBeBuilt(100);
+		
+		BuildRunner<Measurement> runner = new BuildRunner<>();
+		runner.addBuilder(heartBeatMonitorDataForAlex);
+		runner.addBuilder(otherSensorDataForAlex);
+		runner.addBuilder(sensorDataForOtherUsers);
+		
+		List<Measurement> measurements = runner.build();
+		System.out.println("number of created measurement: " + measurements.size());
+		
+		mongoOps.insertAll(measurements);
 	}
 
 }
