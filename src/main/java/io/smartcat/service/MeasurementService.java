@@ -22,4 +22,9 @@ public class MeasurementService {
 //		select * from measurements where owner = 'batman' sort by created desc limit 50;
 		return measurementRepository.findByOwner(username, request);
 	}
+	
+	public List<Measurement> getMeasurementsByUserAndSensor(String owner, String sensor) {
+//		db.measurements.find({owner : "batman", sensor : "proximity"}, {_id : 0, _class : 0})
+		return measurementRepository.findByOwnerAndSensor(owner, sensor);
+	}
 }
