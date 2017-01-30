@@ -48,7 +48,7 @@
 		<dependency>
 			<groupId>io.smartcat</groupId>
 			<artifactId>data-gen</artifactId>
-			<version>0.0.1</version>
+			<version>0.0.2</version>
 		</dependency>
 	</dependencies>
 
@@ -84,7 +84,7 @@
 							<port>37017</port>
 							<!-- optional, default 27017 -->
 
-							<version>3.2</version>
+							<version>3.2.2</version>
 							<!-- optional, defaults to latest production release -->
 
 							<databaseDirectory>/tmp/mongotest</databaseDirectory>

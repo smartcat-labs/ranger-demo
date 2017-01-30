@@ -43,15 +43,15 @@ public class UserRestController {
 		RandomBuilder<Measurement> measurementBuilder = new RandomBuilder<>(Measurement.class);
 		measurementBuilder
 			.randomFrom("sensor", "Heart Beat Monitor", "Blood Preassure Monitor")
-			.randomFrom("owner", "batman", "superman", "robin", "jedi", "yoda")
+			.randomFrom("owner", "superman", "robin", "jedi", "yoda")
 			.randomFromRange("created", 1000L, 15000L)
 			.toBeBuilt(5000);
 		
 		RandomBuilder<Measurement> last50Measurements = new RandomBuilder<>(Measurement.class);
 		last50Measurements
 			.randomFrom("sensor", "Heart Beat Monitor", "Blood Preassure Monitor")
-			.exclusiveRandomFrom("owner", "batman")
-			.exclusiveRandomFromRange("created", 14000L, 15000L)
+			.randomFrom("owner", "batman")
+			.randomFromRange("created", 14000L, 15000L)
 			.toBeBuilt(50);
 		
 		BuildRunner<Measurement> runner = new BuildRunner<>();
@@ -79,7 +79,7 @@ public class UserRestController {
 		
 		RandomBuilder<User> ourUserBuilder = new RandomBuilder<>(User.class);
 		userBuilder
-			.exclusiveRandomFrom("username", "batman")
+			.randomFrom("username", "batman")
 			.randomFromRange("birthdate", year1970, year1980)
 			.toBeBuilt(1);
 		
