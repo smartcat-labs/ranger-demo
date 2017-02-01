@@ -18,7 +18,13 @@ public class MeasurementService {
 
 	public List<Measurement> getNewestMeasurementsForUser(String username, int limit) {
 		PageRequest request = new PageRequest(0, limit, new Sort(Sort.Direction.DESC, "created"));
-		// db.measurements.find( { owner : "passed_username" }).sort( { created : -1 }).limit(50);
+//		db.measurements.find( { owner : "batman" }).sort( { created : -1 }).limit(50);
+//		select * from measurements where owner = 'batman' sort by created desc limit 50;
 		return measurementRepository.findByOwner(username, request);
+	}
+	
+	public List<Measurement> getMeasurementsByUserAndSensor(String owner, String sensor) {
+//		db.measurements.find({owner : "batman", sensor : "proximity"}, {_id : 0, _class : 0})
+		return measurementRepository.findByOwnerAndSensor(owner, sensor);
 	}
 }
