@@ -12,5 +12,6 @@ public interface MeasurementRepository  extends CrudRepository<Measurement, Seri
 	
 	List<Measurement> findByOwner(String owner, Pageable pageable);
 	List<Measurement> findByOwnerAndSensor(String owner, String sensor);
+	List<Measurement> findByOwnerAndSensor(String owner, String sensor, Pageable pageable);
 
 }

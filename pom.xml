@@ -47,8 +47,8 @@
 
 		<dependency>
 			<groupId>io.smartcat</groupId>
-			<artifactId>data-gen</artifactId>
-			<version>0.0.2</version>
+			<artifactId>ranger</artifactId>
+			<version>0.0.5</version>
 		</dependency>
 	</dependencies>
 

@@ -9,29 +9,19 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoOperations;
-import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import io.smartcat.data.loader.BuildRunner;
-import io.smartcat.data.loader.RandomBuilder;
 import io.smartcat.domain.Measurement;
-import io.smartcat.domain.User;
+import io.smartcat.ranger.AggregatedObjectGenerator;
+import io.smartcat.ranger.ObjectGenerator;
 import io.smartcat.repository.MeasurementRepository;
-import io.smartcat.repository.UserRepository;
 import io.smartcat.service.AvgHeartBeatRateDTO;
 import io.smartcat.service.MeasurementService;
 import io.smartcat.service.ReportService;
-import io.smartcat.service.UserService;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class RangerDemoApplicationTests {
-	
-	@Autowired
-	private UserService userService;
-	
-	@Autowired
-	private UserRepository userRepository;
 	
 	@Autowired
 	private MongoOperations mongoOps;
@@ -44,44 +34,26 @@ public class RangerDemoApplicationTests {
 	
 	@Autowired
 	private ReportService reportService;
-
-	@Test
-	public void contextLoads() {
-		userService.create("testingson");
-		
-		List<User> users = userRepository.findByUsername("testingson");
-		Assert.assertEquals(1, users.size());
-		Assert.assertEquals("testingson", users.get(0).getUsername());
-	}
 	
 	@Test
-	public void test_insert() {
-		User u = new User();
-		u.setUsername("milan");
+	public void should_return_newest_50_measurements_for_selected_user_and_sensor() {
+		createTestMeasurements();
+		List<Measurement> result = measurementService.getNewestMeasurementsForUserAndSensor("charlie", "thermometer", 50);
 		
-		mongoOps.insert(u);
-		
-		BasicQuery query = new BasicQuery("{username: 'milan' }");
-		User foundUser = mongoOps.findOne(query, User.class);
-		
-		Assert.assertEquals("milan", foundUser.getUsername());
-	}
-	
-	@Test
-	public void should_return_only_measurements_for_selected_user() {
-		createMeasurementsWithRanger();
-		List<Measurement> result = measurementService.getNewestMeasurementsForUser("batman", 50);
+		// validate that 50 results are returned
 		Assert.assertEquals(50, result.size());
-		result.forEach(measurement -> Assert.assertEquals("batman", measurement.getOwner()));
-	}
-	
-	@Test
-	public void should_return_data_in_descending_order() {
-		createMeasurementsWithRanger();
-		List<Measurement> result = measurementService.getNewestMeasurementsForUser("batman", 50);
 		
-		Assert.assertEquals(50, result.size()); // need this in order to ensure that non empty list
+		// validate that user is "charlie"
+		result.forEach(measurement -> Assert.assertEquals("charlie", measurement.getOwner()));
 		
+		// validate that sensor is "thermometer"
+		result.forEach(measurement -> Assert.assertEquals("thermometer", measurement.getSensor()));
+		
+		// validate that created is between 1000 and 1100
+		result.forEach(measurement -> 
+			Assert.assertTrue(measurement.getCreated() >= 1000 && measurement.getCreated() < 1100));
+		
+		// validate that data is returned in descending order by "created" timestamp
 		long previousTimestamp = result.get(0).getCreated();
 		for (Measurement m : result) {
 			Assert.assertTrue(m.getCreated() <= previousTimestamp);
@@ -89,52 +61,49 @@ public class RangerDemoApplicationTests {
 		}
 	}
 	
-	@Test
-	public void should_return_the_newest_measurements() {
-		createMeasurementsWithRanger();
-		List<Measurement> result = measurementService.getNewestMeasurementsForUser("batman", 50);
-		// we "marked" the newest data with "Third Party Sensor", in order to ensure that they are the newest
-		// I could have also checked that timestamp is between 15000 and 15050, it's the same thing.
-		result.forEach(measurement -> Assert.assertEquals("Third Party Sensor", measurement.getSensor()));
-	}
-
-	// this creates test data for whole bunch of test cases:
-	// 1. batman's and only batman's data are returned (there are other users as well, test checks that all the data returned is batman's)
-	// 2. data is returned in descending order -> 
-	// 3. data returned is the newest data for the user ( there are other data as well, but we "marked" the newest data in a way, in this case we set that the newest data is from "Third Party Sensor"
-	// Q: is there better way to manually create test data? How did you solve this problem.
-	private void createMeasurementsWithRanger() {
-		RandomBuilder<Measurement> newestMeasurementsForBatman = new RandomBuilder<>(Measurement.class);
-		newestMeasurementsForBatman
-			.randomFrom("sensor", "Third Party Sensor") // mark the newest results with "Third Party Sensor"
-			.randomFrom("owner", "batman")
-			.randomFromRange("created", 15000L, 15050L) // this is latest timestamp
-			.toBeBuilt(50);
+	private void createTestMeasurements() {
+		System.out.println("Starting data generation...");
+		long start = System.currentTimeMillis();
 		
-		RandomBuilder<Measurement> overlappingMeasurementTimestampOtherOwners = new RandomBuilder<>(Measurement.class);
-		overlappingMeasurementTimestampOtherOwners
-			.randomFrom("sensor", "Heart Beat Monitor", "Blood Preassure Monitor")
-			.randomFrom("owner", "superman", "robin", "jedi", "yoda") // note: no "batman"
-			.randomFromRange("created", 14000L, 16000L)
-			.toBeBuilt(1000);
+		ObjectGenerator<Measurement> newestMeasurementsForCharlieAndThermometer = new ObjectGenerator.Builder<Measurement>(Measurement.class)
+				.withValues("owner", "charlie")
+				.withRanges("created", 1000L, 1100L)
+				.withValues("sensor", "thermometer")
+				.withValues("version", (short) 1)
+				.toBeGenerated(50).build();
 		
-		RandomBuilder<Measurement> olderDataForBatman = new RandomBuilder<>(Measurement.class);
-		olderDataForBatman
-			.randomFrom("sensor", "Heart Beat Monitor", "Blood Preassure Monitor")
-			.randomFrom("owner", "batman")
-			.randomFromRange("created", 1000L, 15000L)
-			.toBeBuilt(1000);
+		ObjectGenerator<Measurement> overlappingMeasurementTimestampOtherOwners = new ObjectGenerator.Builder<Measurement>(Measurement.class)
+				.withValues("owner", "alice", "bob", "david", "emma", "flint") // note: no "charlie"
+				.withRanges("created", 1000L, 1100L)
+				.withValues("sensor",  "heart-rate-monitor", "accelerometer", "hygrometer", "thermometer")
+				.toBeGenerated(1000).build();
 		
-		BuildRunner<Measurement> runner = new BuildRunner<>();
-		runner.addBuilder(olderDataForBatman);
-		runner.addBuilder(overlappingMeasurementTimestampOtherOwners);
-		runner.addBuilder(newestMeasurementsForBatman);
+		ObjectGenerator<Measurement> newerDataForCharlieAndNonThermometer = new ObjectGenerator.Builder<Measurement>(Measurement.class)
+				.withValues("owner", "charlie")
+				.withRanges("created", 1100L, 1200L)
+				.withValues("sensor", "heart-rate-monitor", "accelerometer", "hygrometer")
+				.toBeGenerated(1000).build();
 		
-		List<Measurement> measurements = runner.build();
+		ObjectGenerator<Measurement> oldDataForCharlie = new ObjectGenerator.Builder<Measurement>(Measurement.class)
+				.withValues("owner", "charlie")
+				.withRanges("created", 500L, 1000L)
+				.withValues("sensor", "heart-rate-monitor", "accelerometer", "hygrometer", "thermometer")
+				.toBeGenerated(1000).build();
 		
-		System.out.println("number of created measurements: " + measurements.size());
-		
+        AggregatedObjectGenerator<Measurement> aggregatedObjectGenerator = new AggregatedObjectGenerator.Builder<Measurement>()
+                .withObjectGenerator(newestMeasurementsForCharlieAndThermometer)
+                .withObjectGenerator(overlappingMeasurementTimestampOtherOwners)
+                .withObjectGenerator(oldDataForCharlie)
+                .withObjectGenerator(newerDataForCharlieAndNonThermometer)
+                .build();
+        
+        List<Measurement> measurements = aggregatedObjectGenerator.generateAll();
+		long end = System.currentTimeMillis();
+		System.out.println("Data generated in: " + (end - start)/1000 + " seconds");
+		System.out.println("Saving data in db...");
 		mongoOps.insertAll(measurements);
+		long endSave = System.currentTimeMillis();
+		System.out.println("Data saved in db in: " + (endSave - end)/1000 + " seconds");
 		
 	}
 	
@@ -159,75 +128,75 @@ public class RangerDemoApplicationTests {
 	// 3. create hbm data in wrong time window (before and after)
 	// 4. 
 	private void createAverageHeartBeatData() {
-		String hbm = "Heart Beat Monitor";
-		RandomBuilder<Measurement> measurmentsBefore = new RandomBuilder<>(Measurement.class);
-		measurmentsBefore
-			.randomFrom("sensor", hbm, "a sensor", "b sensor", "c sensor") 
-			.randomFrom("owner", "alex", "bob", "charlie", "david")
-			.randomFromRange("created", 90L, 100L)
-			.randomFromRange("measuredValue", 30L, 121L)
-			.toBeBuilt(500);
-		
-		RandomBuilder<Measurement> measurmentsAfter = new RandomBuilder<>(Measurement.class);
-		measurmentsAfter
-			.randomFrom("sensor", hbm, "a sensor", "b sensor", "c sensor") 
-			.randomFrom("owner", "alex", "bob", "charlie", "david")
-			.randomFromRange("created", 110L, 120L)
-			.randomFromRange("measuredValue", 30L, 121L)
-			.toBeBuilt(500);
-		
-		RandomBuilder<Measurement> otherSensorsInCorrectTimeRange = new RandomBuilder<>(Measurement.class);
-		otherSensorsInCorrectTimeRange
-			.randomFrom("sensor", "a sensor", "b sensor", "c sensor") 
-			.randomFrom("owner", "alex", "bob", "charlie", "david")
-			.randomFromRange("created", 100L, 110L)
-			.randomFromRange("measuredValue", 30L, 121L)
-			.toBeBuilt(500);
-		
-		RandomBuilder<Measurement> dataOfInterestForAlex1 = new RandomBuilder<>(Measurement.class);
-		dataOfInterestForAlex1
-			.randomFrom("sensor", hbm) 
-			.randomFrom("owner", "alex")
-			.randomFromRange("created", 100L, 110L)
-			.randomFromRange("measuredValue", 60L, 61L)
-			.toBeBuilt(1);
-		
-		RandomBuilder<Measurement> dataOfInterestForAlex2 = new RandomBuilder<>(Measurement.class);
-		dataOfInterestForAlex2
-			.randomFrom("sensor", hbm) 
-			.randomFrom("owner", "alex")
-			.randomFromRange("created", 100L, 110L)
-			.randomFromRange("measuredValue", 62L, 63L)
-			.toBeBuilt(1);
-		
-		RandomBuilder<Measurement> dataOfInterestForBob = new RandomBuilder<>(Measurement.class);
-		dataOfInterestForBob
-			.randomFrom("sensor", hbm) 
-			.randomFrom("owner", "bob")
-			.randomFromRange("created", 100L, 110L)
-			.randomFromRange("measuredValue", 70L, 71L)
-			.toBeBuilt(1);
-		
-		RandomBuilder<Measurement> dataOfInterestForBob2 = new RandomBuilder<>(Measurement.class);
-		dataOfInterestForBob2
-			.randomFrom("sensor", hbm) 
-			.randomFrom("owner", "bob")
-			.randomFromRange("created", 100L, 110L)
-			.randomFromRange("measuredValue", 72L, 73L)
-			.toBeBuilt(1);
-		
-		BuildRunner<Measurement> runner = new BuildRunner<>();
-		runner.addBuilder(measurmentsBefore);
-		runner.addBuilder(measurmentsAfter);
-		runner.addBuilder(otherSensorsInCorrectTimeRange);
-		runner.addBuilder(dataOfInterestForAlex1);
-		
-		runner.addBuilder(dataOfInterestForAlex2);
-		runner.addBuilder(dataOfInterestForBob);
-		runner.addBuilder(dataOfInterestForBob2);
-		
-		List<Measurement> measurements = runner.build();
-		mongoOps.insertAll(measurements);
+//		String hbm = "Heart Beat Monitor";
+//		RandomBuilder<Measurement> measurmentsBefore = new RandomBuilder<>(Measurement.class);
+//		measurmentsBefore
+//			.randomFrom("sensor", hbm, "a sensor", "b sensor", "c sensor") 
+//			.randomFrom("owner", "alex", "bob", "charlie", "david")
+//			.randomFromRange("created", 90L, 100L)
+//			.randomFromRange("measuredValue", 30L, 121L)
+//			.toBeBuilt(500);
+//		
+//		RandomBuilder<Measurement> measurmentsAfter = new RandomBuilder<>(Measurement.class);
+//		measurmentsAfter
+//			.randomFrom("sensor", hbm, "a sensor", "b sensor", "c sensor") 
+//			.randomFrom("owner", "alex", "bob", "charlie", "david")
+//			.randomFromRange("created", 110L, 120L)
+//			.randomFromRange("measuredValue", 30L, 121L)
+//			.toBeBuilt(500);
+//		
+//		RandomBuilder<Measurement> otherSensorsInCorrectTimeRange = new RandomBuilder<>(Measurement.class);
+//		otherSensorsInCorrectTimeRange
+//			.randomFrom("sensor", "a sensor", "b sensor", "c sensor") 
+//			.randomFrom("owner", "alex", "bob", "charlie", "david")
+//			.randomFromRange("created", 100L, 110L)
+//			.randomFromRange("measuredValue", 30L, 121L)
+//			.toBeBuilt(500);
+//		
+//		RandomBuilder<Measurement> dataOfInterestForAlex1 = new RandomBuilder<>(Measurement.class);
+//		dataOfInterestForAlex1
+//			.randomFrom("sensor", hbm) 
+//			.randomFrom("owner", "alex")
+//			.randomFromRange("created", 100L, 110L)
+//			.randomFromRange("measuredValue", 60L, 61L)
+//			.toBeBuilt(1);
+//		
+//		RandomBuilder<Measurement> dataOfInterestForAlex2 = new RandomBuilder<>(Measurement.class);
+//		dataOfInterestForAlex2
+//			.randomFrom("sensor", hbm) 
+//			.randomFrom("owner", "alex")
+//			.randomFromRange("created", 100L, 110L)
+//			.randomFromRange("measuredValue", 62L, 63L)
+//			.toBeBuilt(1);
+//		
+//		RandomBuilder<Measurement> dataOfInterestForBob = new RandomBuilder<>(Measurement.class);
+//		dataOfInterestForBob
+//			.randomFrom("sensor", hbm) 
+//			.randomFrom("owner", "bob")
+//			.randomFromRange("created", 100L, 110L)
+//			.randomFromRange("measuredValue", 70L, 71L)
+//			.toBeBuilt(1);
+//		
+//		RandomBuilder<Measurement> dataOfInterestForBob2 = new RandomBuilder<>(Measurement.class);
+//		dataOfInterestForBob2
+//			.randomFrom("sensor", hbm) 
+//			.randomFrom("owner", "bob")
+//			.randomFromRange("created", 100L, 110L)
+//			.randomFromRange("measuredValue", 72L, 73L)
+//			.toBeBuilt(1);
+//		
+//		BuildRunner<Measurement> runner = new BuildRunner<>();
+//		runner.addBuilder(measurmentsBefore);
+//		runner.addBuilder(measurmentsAfter);
+//		runner.addBuilder(otherSensorsInCorrectTimeRange);
+//		runner.addBuilder(dataOfInterestForAlex1);
+//		
+//		runner.addBuilder(dataOfInterestForAlex2);
+//		runner.addBuilder(dataOfInterestForBob);
+//		runner.addBuilder(dataOfInterestForBob2);
+//		
+//		List<Measurement> measurements = runner.build();
+//		mongoOps.insertAll(measurements);
 	}
 	
 	@Test
@@ -249,39 +218,39 @@ public class RangerDemoApplicationTests {
 	// 3. measurements for owner = [bob, charlie, david] and sensors [HEART_BEAT_MONITOR, ACCELEROMETER, COMPAS, THIRD_PARTY_SENSOR] // noise
 	// 
 	private void createTestDataFor_findByOwnerAndSensor() {
-		RandomBuilder<Measurement> heartBeatMonitorDataForAlex = new RandomBuilder<>(Measurement.class);
-		heartBeatMonitorDataForAlex
-			.randomFrom("sensor", "HEART_BEAT_MONITOR") 
-			.randomFrom("owner", "alex")
-			.randomFromRange("created", 100L, 110L)
-			.randomFromRange("measuredValue", 60L, 61L)
-			.toBeBuilt(10);
-		
-		RandomBuilder<Measurement> otherSensorDataForAlex = new RandomBuilder<>(Measurement.class);
-		otherSensorDataForAlex
-			.randomFrom("sensor", "ACCELEROMETER", "COMPAS", "THIRD_PARTY_SENSOR") 
-			.randomFrom("owner", "alex")
-			.randomFromRange("created", 110L, 120L)
-			.randomFromRange("measuredValue", 3L, 100L)
-			.toBeBuilt(100);
-		
-		RandomBuilder<Measurement> sensorDataForOtherUsers = new RandomBuilder<>(Measurement.class);
-		sensorDataForOtherUsers
-			.randomFrom("sensor", "HEART_BEAT_MONITOR", "ACCELEROMETER", "COMPAS", "THIRD_PARTY_SENSOR") 
-			.randomFrom("owner", "bob", "charlie", "david")
-			.randomFromRange("created", 150L, 200L)
-			.randomFromRange("measuredValue", 3L, 100L)
-			.toBeBuilt(100);
-		
-		BuildRunner<Measurement> runner = new BuildRunner<>();
-		runner.addBuilder(heartBeatMonitorDataForAlex);
-		runner.addBuilder(otherSensorDataForAlex);
-		runner.addBuilder(sensorDataForOtherUsers);
-		
-		List<Measurement> measurements = runner.build();
-		System.out.println("number of created measurement: " + measurements.size());
-		
-		mongoOps.insertAll(measurements);
+//		RandomBuilder<Measurement> heartBeatMonitorDataForAlex = new RandomBuilder<>(Measurement.class);
+//		heartBeatMonitorDataForAlex
+//			.randomFrom("sensor", "HEART_BEAT_MONITOR") 
+//			.randomFrom("owner", "alex")
+//			.randomFromRange("created", 100L, 110L)
+//			.randomFromRange("measuredValue", 60L, 61L)
+//			.toBeBuilt(10);
+//		
+//		RandomBuilder<Measurement> otherSensorDataForAlex = new RandomBuilder<>(Measurement.class);
+//		otherSensorDataForAlex
+//			.randomFrom("sensor", "ACCELEROMETER", "COMPAS", "THIRD_PARTY_SENSOR") 
+//			.randomFrom("owner", "alex")
+//			.randomFromRange("created", 110L, 120L)
+//			.randomFromRange("measuredValue", 3L, 100L)
+//			.toBeBuilt(100);
+//		
+//		RandomBuilder<Measurement> sensorDataForOtherUsers = new RandomBuilder<>(Measurement.class);
+//		sensorDataForOtherUsers
+//			.randomFrom("sensor", "HEART_BEAT_MONITOR", "ACCELEROMETER", "COMPAS", "THIRD_PARTY_SENSOR") 
+//			.randomFrom("owner", "bob", "charlie", "david")
+//			.randomFromRange("created", 150L, 200L)
+//			.randomFromRange("measuredValue", 3L, 100L)
+//			.toBeBuilt(100);
+//		
+//		BuildRunner<Measurement> runner = new BuildRunner<>();
+//		runner.addBuilder(heartBeatMonitorDataForAlex);
+//		runner.addBuilder(otherSensorDataForAlex);
+//		runner.addBuilder(sensorDataForOtherUsers);
+//		
+//		List<Measurement> measurements = runner.build();
+//		System.out.println("number of created measurement: " + measurements.size());
+//		
+//		mongoOps.insertAll(measurements);
 	}
 
 }

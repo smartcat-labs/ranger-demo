@@ -16,13 +16,8 @@ import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
 import com.mongodb.MongoException;
 
-import io.smartcat.repository.MeasurementRepository;
-
 @Service
 public class ReportService {
-	
-	@Autowired
-	private MeasurementRepository measurementRepository;
 	
 	@Autowired
 	private MongoOperations mongoOps;
@@ -35,7 +30,7 @@ public class ReportService {
 				DBCollection collection = db.getCollection("measurements");
 
 				//  db.measurements.aggregate( [
-				//	{ $match : { created : {$gte : 10000, $lte : 15050 }, sensor : "Heart Beat Monitor"}}, 
+				//	{ $match : { created : {$gte : 10_000, $lte : 15_050 }, sensor : "Heart Beat Monitor"}}, 
 				//	{ $group : {_id : {owner : "$owner", sensor : "$sensor"}, avg_hb : {$avg : "$measuredValue"}}}, 
 				//	{ $project : {_id : 0, owner : "$_id.owner", avg_hb : "$avg_hb"}}])
 				DBObject match = new BasicDBObject("$match", new BasicDBObject("created", new BasicDBObject("$gte", startDate).append("$lt", endDate)).append("sensor", "Heart Beat Monitor"));

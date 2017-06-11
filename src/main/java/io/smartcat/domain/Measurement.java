@@ -1,5 +1,7 @@
 package io.smartcat.domain;
 
+import java.util.Date;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -12,6 +14,9 @@ public class Measurement {
 	private String sensor;
 	private String owner;
 	private long measuredValue;
+	private short version;
+	private Date lastChanged;
+	private boolean active;
 	
 	public String getId() {
 		return id;
@@ -43,5 +48,22 @@ public class Measurement {
 	public void setMeasuredValue(long measuredValue) {
 		this.measuredValue = measuredValue;
 	}
-
+	public Date getLastChanged() {
+		return lastChanged;
+	}
+	public void setLastChanged(Date lastChanged) {
+		this.lastChanged = lastChanged;
+	}
+	public short getVersion() {
+		return version;
+	}
+	public void setVersion(short version) {
+		this.version = version;
+	}
+	public boolean isActive() {
+		return active;
+	}
+	public void setActive(boolean active) {
+		this.active = active;
+	}
 }

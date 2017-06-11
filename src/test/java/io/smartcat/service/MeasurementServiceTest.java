@@ -1,6 +1,5 @@
 package io.smartcat.service;
 
-import java.util.Collections;
 import java.util.List;
 
 import org.junit.Assert;
@@ -11,11 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import com.sun.jna.platform.win32.OaIdl.MEMBERID;
-
-import io.smartcat.data.loader.BuildRunner;
-import io.smartcat.data.loader.RandomBuilder;
 import io.smartcat.domain.Measurement;
+import io.smartcat.ranger.AggregatedObjectGenerator;
+import io.smartcat.ranger.ObjectGenerator;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
@@ -28,58 +25,55 @@ public class MeasurementServiceTest {
 	private MongoOperations mongoOps;
 	
 	// test for demo purposes only
-	// not orthogonal and stuff
 	@Test
 	public void findByOwnerAndSensor_shouldReturnCorrectData_forPassedOwnerAndSensor() {
 		createTestData();
-		List<Measurement> result = measurementService.getMeasurementsByUserAndSensor("batman", "proximity");
+		List<Measurement> result = measurementService.getMeasurementsByUserAndSensor("flint", "EM-sensor");
 		
 		Assert.assertEquals(50, result.size());
 		
-		result.forEach(measurement -> Assert.assertEquals("batman", measurement.getOwner()));
-		result.forEach(measurement -> Assert.assertEquals("proximity", measurement.getSensor()));
+		result.forEach(measurement -> Assert.assertEquals("flint", measurement.getOwner()));
+		result.forEach(measurement -> Assert.assertEquals("EM-sensor", measurement.getSensor()));
 	}
 	
 	private void createTestData() {		
 		System.out.println("Starting data generation...");
 		long start = System.currentTimeMillis();
 		
-		RandomBuilder<Measurement> otherUsersData = new RandomBuilder<>(Measurement.class);
-		otherUsersData.randomFrom("owner", "superman", "robin", "goblin")
-		.randomFromRange("created", 1000L, 2000L)
-		.randomFromRange("measuredValue", 0L, 100L)
-		.randomFrom("sensor", "hbm", "accelerometer", "hygrometer", "proximity")
-		.toBeBuilt(400000);
+		ObjectGenerator<Measurement> otherUsersData = new ObjectGenerator.Builder<Measurement>(Measurement.class)
+				.withValues("owner", "alice", "bob", "charlie", "david", "emma")
+				.withRanges("created", 1000L, 2000L)
+				.withRanges("measuredValue", 0L, 100L)
+				.withValues("sensor", "hear-rate-monitor", "accelerometer", "hygrometer", "thermometer")
+				.toBeGenerated(400_000).build();
 		
-		RandomBuilder<Measurement> batmansProximity = new RandomBuilder<>(Measurement.class);
-		batmansProximity.randomFrom("owner", "batman")
-		.randomFromRange("created", 1500L, 1600L)
-		.randomFromRange("measuredValue", 0L, 100L)
-		.randomFrom("sensor", "proximity")
-		.toBeBuilt(50);
+		ObjectGenerator<Measurement> flintUserData = new ObjectGenerator.Builder<Measurement>(Measurement.class)
+				.withValues("owner", "flint")
+				.withRanges("created", 1500L, 1600L)
+				.withRanges("measuredValue", 0L, 100L)
+				.withValues("sensor", "EM-sensor")
+				.toBeGenerated(50).build();
 		
-		RandomBuilder<Measurement> otherSensorsForBatman = new RandomBuilder<>(Measurement.class);
-		otherSensorsForBatman.randomFrom("owner", "batman")
-		.randomFromRange("created", 1000L, 1500L)
-		.randomFromRange("measuredValue", 0L, 100L)
-		.randomFrom("sensor", "hbm", "accelerometer", "hygrometer")
-		.toBeBuilt(99950);
+		ObjectGenerator<Measurement> flintUserOtherData = new ObjectGenerator.Builder<Measurement>(Measurement.class)
+				.withValues("owner", "flint")
+				.withRanges("created", 1000L, 1500L)
+				.withRanges("measuredValue", 0L, 100L)
+				.withValues("sensor", "hear-rate-monitor", "accelerometer", "hygrometer", "thermometer")
+				.toBeGenerated(99_950).build();
 		
-		BuildRunner<Measurement> runner = new BuildRunner<>();
-		runner.addBuilder(otherUsersData);
-		runner.addBuilder(batmansProximity);
-		runner.addBuilder(otherSensorsForBatman);
-		
-		List<Measurement> result = runner.build();
+        AggregatedObjectGenerator<Measurement> aggregatedObjectGenerator = new AggregatedObjectGenerator.Builder<Measurement>()
+                .withObjectGenerator(otherUsersData)
+                .withObjectGenerator(flintUserOtherData)
+                .withObjectGenerator(flintUserData).build();
+        
+        List<Measurement> measurements = aggregatedObjectGenerator.generateAll();
 		long end = System.currentTimeMillis();
 		System.out.println("Data generated in: " + (end - start)/1000 + " seconds");
 		System.out.println("Saving data in db...");
-		mongoOps.insertAll(result);
+		mongoOps.insertAll(measurements);
 		long endSave = System.currentTimeMillis();
 		System.out.println("Data saved in db in: " + (endSave - end)/1000 + " seconds");
 		
-		
 	}
-
 
 }
