@@ -115,7 +115,7 @@ AggregatedObjectGenerator<Measurement> aggregatedObjectGenerator =
 List<Measurement> measurements = aggregatedObjectGenerator.generateAll();
 ```
 
-Voila!
+Voilà!
 
 ## Ranger - real world example
 
