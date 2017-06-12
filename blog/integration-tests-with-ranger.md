@@ -121,7 +121,7 @@ Voilà!
 
 Now that we are familiar with the basic building blocks for Ranger library, let's try it out with a real world example.
 
-I worked on a IoT application that collects measurements from bunch of sensors and provides analytics and alerting based on the stored data. And there was a database query for fetching the newest `n` results for a particular user and sensor. MongoDB was used for storage. So I had the mongodb query that looks something like this:
+I used to work on a IoT application that collects measurements from bunch of sensors and provides analytics and alerting based on the stored data. Application was querying MongoDB (which was used for storage), fetching the newest `n` results for a particular user and sensor. So I had the mongodb query that looks something like this:
 
 ```mongo
 db.measurements.find( { owner : ?,  sensor : ?}).sort( { created : -1 }).limit(50);
@@ -133,7 +133,7 @@ or translated to SQL (for people unfamiliar with Mongo):
 SELECT * FROM measurements WHERE owner = "charlie" AND sensor = "thermometer" SORT BY created DESC LIMIT 50;
 ```
 
-And, or course, I wanted to create automated tests for that query.
+And, of course, I wanted to create automated tests for that query.
 For the simplicity, in this example, I will test all the cases in one test method. If you like to do it by the book you would probably create a separate, orthogonal test for each case.
 
 ```java
